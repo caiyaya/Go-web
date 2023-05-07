@@ -1,6 +1,9 @@
 package main
 
-import "coreweb/framework"
+import (
+	"coreweb/framework"
+	"time"
+)
 
 //func registerRouter(core *framework.Core) {
 //	// 设置控制器
@@ -10,8 +13,10 @@ import "coreweb/framework"
 // 注册路由
 func registerRouter(core *framework.Core) {
 	// http方法 + 静态路由匹配
-	core.Get("user/login", UserLoginController)
-
+	//core.Get("user/login", UserLoginController)
+	// 在核心业务逻辑 UserLoginController 之外，封装一层 TimeoutHandler
+	// 用函数嵌套的方式，实现了中间件的装饰模式 -> 问题？嵌套太长，没法批量设置
+	core.Get("/user/login", framework.TimeoutHandler(UserLoginController, time.Second))
 	// 批量通用前缀
 	subjectApi := core.Group("/subject")
 	{
