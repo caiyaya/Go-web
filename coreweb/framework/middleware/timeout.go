@@ -1,50 +1,44 @@
-package framework
+package middleware
 
 import (
 	"context"
+	"coreweb/framework"
 	"fmt"
 	"log"
 	"time"
 )
 
-// 增加中间件： 函数嵌套方式
-func TimeoutHandler(fun ControllerHandler, d time.Duration) ControllerHandler {
+func Timeout(d time.Duration) framework.ControllerHandler {
 	// 使用函数回调
-	return func(c *Context) error {
+	return func(c *framework.Context) error {
 		finish := make(chan struct{}, 1)
 		panicChan := make(chan interface{}, 1)
-
-		// 执行业务逻辑前 预操作 初始化 超时 context
+		// 执行业务逻辑前预操作：初始化超时context
 		durationCtx, cancel := context.WithTimeout(c.BaseContext(), d)
 		defer cancel()
 
-		c.request.WithContext(durationCtx)
-		// 执行业务操作
 		go func() {
 			defer func() {
 				if p := recover(); p != nil {
 					panicChan <- p
 				}
 			}()
-			// 执行具体的业务逻辑
-			fun(c)
+			// 使用next执行具体的业务逻辑
+			c.Next()
+
 			finish <- struct{}{}
 		}()
-
 		// 执行业务逻辑后操作
 		select {
 		case p := <-panicChan:
+			c.Json(500, "time out")
 			log.Println(p)
-			c.responseWriter.WriteHeader(500)
 		case <-finish:
 			fmt.Println("finish")
 		case <-durationCtx.Done():
 			c.SetHasTimeout()
-			c.responseWriter.Write([]byte("time out"))
+			c.Json(500, "time out")
 		}
 		return nil
 	}
 }
-
-// 增加中间件： pipeline方式
-// 问题，如何调用？ 见 middleware文件夹
